@@ -1,0 +1,58 @@
+name: Build Calendar APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download project
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Extract source code
+        run: |
+          mkdir build-source
+          unzip -q calendar-apk-github-build.zip -d build-source
+
+      - name: Prepare signing key
+        working-directory: build-source/Calendar-main
+        run: |
+          keytool -genkeypair \
+            -v \
+            -keystore release.keystore \
+            -alias calendar \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass calendar123 \
+            -keypass calendar123 \
+            -dname "CN=Calendar App, O=Personal"
+
+      - name: Build APK
+        working-directory: build-source/Calendar-main
+        env:
+          SIGNING_KEY_ALIAS: calendar
+          SIGNING_KEY_PASSWORD: calendar123
+          SIGNING_STORE_FILE: release.keystore
+          SIGNING_STORE_PASSWORD: calendar123
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleCoreRelease --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: calendar-core-release-apk
+          path: build-source/Calendar-main/app/build/outputs/apk/core/release/*.apk
+          if-no-files-found: error
